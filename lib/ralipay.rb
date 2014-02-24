@@ -1,9 +1,12 @@
+require 'pry'
 module Ralipay
 
-  require 'ralipay/version'
-  require 'ralipay/common'
-  require 'ralipay/service'
-  require 'ralipay/notify'
+  path = "/Users/weston/Downloads/ralipay/lib/"
+
+  require path + 'ralipay/version'
+  require path + 'ralipay/common'
+  require path + 'ralipay/service'
+  require path + 'ralipay/notify'
   require 'json'
   require 'date'
   require 'nokogiri'
@@ -15,7 +18,7 @@ module Ralipay
 
   #初始化参数
   $global_configs = {
-      :secure_type   => 'RSA',
+      :secure_type   => 'MD5',
       :partner       => '',
       :seller_email  => '',
       :notify_url    => '',
@@ -34,7 +37,7 @@ module Ralipay
   $service1            = 'alipay.wap.trade.create.direct'
   $service2            = 'alipay.wap.auth.authAndExecute'
   $format              = 'xml'
-  $sec_id              = '0001'
+  $sec_id              = 'RSA'
   $input_charset       = 'utf-8'
   $input_charset_gbk   = 'GBK'
   $service_pay_channel = 'mobile.merchant.paychannel'
@@ -96,8 +99,9 @@ module Ralipay
       }
 
       #获取token
-      token = Service.new.alipay_wap_trade_create_direct(req_hash)
-
+       token = Service.new.alipay_wap_trade_create_direct(req_hash)
+      # TODO....
+      # token = "20140206fb8da403c21df3b131eaec0365197fff"
       #构造要请求的参数数组，无需改动
       req_hash = {
           :req_data		   => "<auth_and_execute_req><request_token>" \
@@ -113,6 +117,20 @@ module Ralipay
 
       #调用alipay_Wap_Auth_AuthAndExecute接口方法,生成支付地址
       Service.new.alipay_wap_auth_and_execute(req_hash)
+    end
+
+    def create_qrcode
+      #string tmp = "https://mapi.alipay.com/gateway.do?sign_type=MD5&partner=2088101103495019&sign=ffa3e1a9708f07ad20c5229cf9815877&_input_charset=UTF-8&qrcode=%5BAlipay%5D%3A7435301335625758&service=alipay.mobile.qrcode.create&method=stop";  
+      params = {
+          :_input_charset => $input_charset_gbk,
+          :service        =>"alipay.mobile.qrcode.create",
+          :sign_type      => "MD5",
+          :partner        => $global_configs[:partner],
+          :qrcode => 'i%5BAlipay%5D%3A7435301335625758',
+          :method => "createorder",
+          :format => 'json'
+      }
+      Service.new.alipay_mobile_qrcode_create(params)
     end
 
     #同步回调验证,支付后跳转,前端GET方式获得参数,传入hash symbol,该方法只返回bool
@@ -275,6 +293,7 @@ module Ralipay
       params['show_url']       = $global_configs[:merchant_url]
       params['return_url']     = $global_configs[:call_back_url]
       params['notify_url']     = $global_configs[:notify_url]
+      params['qr_pay_mode'] = "3"
       all_params = sign(params)
       all_params_kv = all_params.map do |key,value|
         key + '=' + value

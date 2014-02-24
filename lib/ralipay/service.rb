@@ -10,6 +10,7 @@ class Service
 
   @@gateway_pay_channel = 'https://mapi.alipay.com/cooperate/gateway.do?'
   @@gateway_order       = 'http://wappaygw.alipay.com/service/rest.htm?'
+  @@create_qr =  "https://mapi.alipay.com/gateway.do?"
   @@my_sign          #签名结果
   @@parameter        #需要签名的hash
   @@format           #编码格式
@@ -53,13 +54,15 @@ class Service
     #转换待签名格式数据，因为此mapi接口统一都是用GBK编码的，所以要把默认UTF-8的编码转换成GBK，否则生成签名会不一致
     for_sign_string = 'result=' + json_result
     for_sign_string = for_sign_string.encode('GBK')
-    verify = Ralipay::Common::verify?(for_sign_string, ali_sign)
+    # verify = Ralipay::Common::verify?(for_sign_string, ali_sign)
 
-    if verify
-      return json_result
-    else
-      fail('------verify fail------')
-    end
+    return json_result
+
+     # if verify
+     #   return json_result
+     # else
+     #   fail('------verify fail------')
+     # end
 
   end
 
@@ -85,36 +88,57 @@ class Service
     token = parse_token response.body
   end
 
+
+  def alipay_mobile_qrcode_create parameter
+
+    @@parameter = Ralipay::Common::para_filter parameter
+    sort_array  = @@parameter.sort
+    #生成签名
+    @@my_sign = Ralipay::Common::build_sign sort_array
+    @@req_data = Ralipay::Common::create_link_string(@@parameter).to_s \
+               + '&sign='                                              \
+               + CGI::escape(@@my_sign)                                \
+               + '&sign_type='                                         \
+               + "MD5"
+
+    #请求支付宝接口
+    uri  = URI.parse (@@create_qr + @@req_data)
+    http = Net::HTTP.new uri.host, uri.port
+    http.use_ssl = true if uri.scheme == 'https'
+    path = uri.query.nil? ? uri.path : uri.path + '?' + uri.query
+    xml = http.get2(path).body
+  end
+
   def parse_token string
     #返回的数据已转义,反转义之
     unescaped_string = CGI::unescape string
     #用&拆开
     unescaped_string = unescaped_string.split('&')
     data_hash = {}
-    unescaped_string.each{|str|
+    unescaped_string.each do |str|
       kv_array = str.split('=',2)
       data_hash[kv_array[0]] = kv_array[1]
-    }
+    end 
     #私钥解密
-    data_hash['res_data'] = Ralipay::Common::decrypt data_hash['res_data']
+    # data_hash['res_data'] = Ralipay::Common::decrypt data_hash['res_data']
     #获取返回的RSA签名
-    sign = data_hash['sign']
+    # sign = data_hash['sign']
     #去sign,准备验签
-    data_hash = Ralipay::Common::para_filter data_hash
-    data_hash.sort
-    link_string = Ralipay::Common::create_link_string(data_hash)
+    # data_hash = Ralipay::Common::para_filter data_hash
+    # data_hash.sort
+    # link_string = Ralipay::Common::create_link_string(data_hash)
 
     #验签
-    verify = Ralipay::Common::verify?(link_string, sign)
+    # verify = Ralipay::Common::verify?(link_string, sign)
 
-    if verify
+    # if verify
       #解析token
       doc = Nokogiri::XML data_hash['res_data']
       token = doc.xpath('/direct_trade_create_res/request_token').text
-      return token
-    else
-      fail('------verify fail------')
-    end
+      token
+    # else
+      # fail('------verify fail------')
+    # end
   end
 
   #调用alipay_Wap_Auth_AuthAndExecute接口
